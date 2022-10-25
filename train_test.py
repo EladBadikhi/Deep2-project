@@ -51,8 +51,8 @@ if __name__ == '__main__':
         criterion = nn.CrossEntropyLoss()
         optimizer = optim.SGD(net.parameters(), lr=0.001, momentum=0.9)
 
-        print('Starting training')
-        for epoch in range(params['epochs']):  # loop over the dataset multiple times
+    print('Starting training')
+    for epoch in range(params['epochs']):  # loop over the dataset multiple times
 
             running_loss = 0.0
             for i, data in enumerate(trainloader, 0):
@@ -70,11 +70,11 @@ if __name__ == '__main__':
                 loss.backward()
                 optimizer.step()
 
-                # print statistics
-                running_loss += loss.item()
-                if i % 100 == 99:    # print every 200 mini-batches
-                    print(f'[{epoch + 1}, {i + 1:5d}] loss: {running_loss / 100:.3f}')
-                    running_loss = 0.0
+            # print statistics
+            running_loss += loss.item()
+            if i % 100 == 99:    # print every 200 mini-batches
+                print(f'[{epoch + 1}, {i + 1:5d}] loss: {running_loss / 100:.3f}')
+                running_loss = 0.0
 
         print('Finished Training')
         torch.save(net.state_dict(), p)
