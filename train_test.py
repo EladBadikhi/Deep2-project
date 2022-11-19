@@ -7,12 +7,13 @@ import torch.nn as nn
 import torch.nn.functional as F
 from pathlib import Path
 import sys
+import recoverability
 # params = {'epochs': 20, 'batch_size': 128, 'deepths': [8], 'blocks_sizes': [128]} # 98% train, 75% test
 params = {'epochs': 20, 'batch_size': 128, 'deepths': [8], 'blocks_sizes': [128]}
 if __name__ == '__main__':
     args = sys.argv[1:]
     device = torch.device('cuda:0' if torch.cuda.is_available() else 'cpu')
-    p = './trained_nets/cifar_net.pth'
+    p = './Deep2-project/trained_nets/cifar_net.pth'#'./trained_nets/cifar_net.pth'
     print(f'{device=}')
     transform = transforms.Compose(
         [transforms.ToTensor(),
@@ -69,30 +70,68 @@ if __name__ == '__main__':
     else:
         net.load_state_dict(torch.load(p, map_location=torch.device(device)))
     ############ Pruning ##########
-    with torch.no_grad():
-        # print(f"{net.encoder.gate[0].weight[:,2:,3,4]=}")
-        # net.encoder.gate[0].weight[:,2:,3,4]=0
-        print(net.decoder.decoder.weight)
-        # net.decoder.decoder.weight.data = torch.zeros_like(net.decoder.decoder.weight)
-        # print(f"{net.encoder.gate[0].weight[:,2:,3,4]=}")
-        # print(f"{type(net.encoder.blocks[0])=}, {vars(net.encoder.blocks[0])=}") # Go over all of these! in the depth thar is need to get to all the layers
+    # run_new = False
+    # new_images = []
+    # if run_new:
+    #     with torch.no_grad():
+    #         best_pruned_layer, best_prune_score = net.encoder.gate[0].weight, 0
+    #         for i, data in enumerate(trainloader):
+    #             images, labels = data[0].to(device), data[1].to(device)
+    #             new_images.append(net.encoder.gate[0](images.to(device)))
+    #         #     pruned_layer, prune_score = recoverability.prune_layer(net.encoder.gate[0], images.to(device))
+    #         #     if best_prune_score < prune_score:
+    #         #         best_pruned_layer, best_prune_score = pruned_layer.weight, prune_score
+    #         # net.encoder.gate[0].weight = best_pruned_layer
+            
+    #         #self.encoder.blocks[0].blocks # should be 8 rn
+    #         #self.encoder.blocks[0].blocks[j].blocks # should be about 5 one (conv, batch norm) then one relu alternating 
+    #         #self.encoder.blocks[0].blocks[j].blocks[k].conv.weight
+    #         print("start pruning all")
+    #         for j, sequence in enumerate(net.encoder.blocks[0].blocks):
+    #                 for k, block in enumerate(sequence.blocks):
+    #                     if not getattr(block, 'conv', None):
+    #                         continue
+    #                     best_pruned_layer, best_prune_score = block.conv.weight, 0
+    #                     for i,nimage in enumerate(new_images):
+    #                         pruned_layer, prune_score = recoverability.prune_layer(block.conv, nimage)
+    #                         new_images[i] = block.conv(nimage)
+    #                         block.conv.weight = pruned_layer.weight
+    #                         if best_prune_score < prune_score:
+    #                             best_pruned_layer, best_prune_score = pruned_layer.weight, prune_score
+    #                     print(f"{j=} {k=}")
+    #                     block.weight = best_pruned_layer
     ############ Test ##########
     correct = 0
     total = 0
     # since we're not training, we don't need to calculate the gradients for our outputs
     with torch.no_grad():
-        for data in trainloader:
+        for i,data in enumerate(trainloader):
             # images, labels = data
             images, labels = data[0].to(device), data[1].to(device)
-
             # calculate outputs by running images through the network
+            if i ==0:
+                print("weeeembawehhhhhh")
+                # print(images.shape)
+                # pruned = recoverability.prune_layer(net.encoder.gate[0], images.to(device)).weight
+                x= net.encoder.gate[0](images.to(device))
+                # net.encoder.gate[0].weight = pruned
+                #self.encoder.blocks[0].blocks # should be 8 rn
+                #self.encoder.blocks[0].blocks[j].blocks # should be about 5 one (conv, batch norm) then one relu alternating 
+                #self.encoder.blocks[0].blocks[j].blocks[k].conv.weight
+                for j, sequence in enumerate(net.encoder.blocks[0].blocks):
+                    for k, block in enumerate(sequence.blocks):
+                        if not getattr(block, 'conv', None):
+                            continue
+                        print(f"{j=} {k=}")
+                        pruned, _ = recoverability.prune_layer(block.conv, x)
+                        x = block.conv(x)
+                        block.conv.weight = pruned.weight
             outputs = net(images)
             # the class with the highest energy is what we choose as prediction
             _, predicted = torch.max(outputs.data, 1)
             total += labels.size(0)
             correct += (predicted == labels).sum().item()
-
-    print(f'Accuracy of the network on the train images: {100 * correct // total} %')
+    print(f'Accuracy of the network on the train images: {100 * correct / total} %')
     correct = 0
     total = 0
     # since we're not training, we don't need to calculate the gradients for our outputs
@@ -100,7 +139,6 @@ if __name__ == '__main__':
         for data in testloader:
             # images, labels = data
             images, labels = data[0].to(device), data[1].to(device)
-
             # calculate outputs by running images through the network
             outputs = net(images)
             # the class with the highest energy is what we choose as prediction
@@ -108,4 +146,4 @@ if __name__ == '__main__':
             total += labels.size(0)
             correct += (predicted == labels).sum().item()
 
-    print(f'Accuracy of the network on the 10000 test images: {100 * correct // total} %')
+    print(f'Accuracy of the network on the 10000 test images: {100 * correct / total} %')
