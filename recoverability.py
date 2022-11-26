@@ -3,16 +3,16 @@ import torch
 import torch.nn as nn
 import copy
 
-max_dist = 6
-lam = 0.6
-print(f"{max_dist=}, {lam=}")
+max_dist = 2
+lam = 0.2
+span = 5
+print(f"{max_dist=}, {lam=}, {span=}")
 def recov_distance(x : torch.Tensor, y : torch.Tensor, p=2):
     return torch.norm(torch.abs(x-y),p=p,dim=(1,2,3)).max()
 def recoverability_loss(layer : nn.Module, x : torch.Tensor, y : torch.Tensor):
     #for loop for every option 4 d skip color dim
     modif_layer = copy.deepcopy(layer)
     min_dist = 1.1
-    span = 5
     bestlist, min_list = [], []
     import timeit
     staime = timeit.default_timer()
@@ -26,11 +26,15 @@ def recoverability_loss(layer : nn.Module, x : torch.Tensor, y : torch.Tensor):
                     min = span if modif_layer.weight.shape[1] > span else modif_layer.weight.shape[1]
                     for c in range(0,modif_layer.weight.shape[1],min+1):
                         min = span if modif_layer.weight.shape[1] - c > span else modif_layer.weight.shape[1] - c
-                        if all([(modif_layer.weight[i,iter,j,k].item() == 0) for iter in range(c,c+min)]):
-                            print("skipping ", min)
+                        if all([(modif_layer.weight[i,iter,j,k].item() == 0) for iter in range(c,c+min)]):#torch.all((modif_layer.weight[i,c:c+min,j,k] == 0)).item():
+                            # print("skipping ", min)
                             continue
                         # modif_layer = copy.deepcopy(unchange_layer)
+                        
+                        # for iter in range(c,c+min):
+                        #     modif_layer.weight[i,iter,j,k].item() == 0
                         modif_layer.weight[i,c:c+min,j,k] = 0
+                        
                         # minus = torch.zeros_like(layer.weight)
                         # minus[i,c,j,k] = layer.weight[i,c,j,k]
                         # minus = minus.to_sparse()
@@ -38,15 +42,17 @@ def recoverability_loss(layer : nn.Module, x : torch.Tensor, y : torch.Tensor):
                         dist = recov_distance(y, modif_layer(x))
                         if dist < min_dist:
                             best = (i,c,min,j,k)
-                            print("best ", best)
+                            # print("best ", best)
                             min_dist = dist
                             # min_layer = copy.deepcopy(modif_layer)
+                        # for iter in range(c,c+min):
+                        #     modif_layer.weight[i,iter,j,k].item() == layer.weight[i,c:c+min,j,k] 
                         modif_layer.weight[i,c:c+min,j,k] = layer.weight[i,c:c+min,j,k] 
         
         print(f"time for round {timeit.default_timer()-roundstaime}" )
         print("final round min",min_dist, best)
         bestlist.append(best)
-        min_list.append((min_dist, best, bestlist.copy()))#min_layer->best
+        min_list.append((min_dist, bestlist.copy()))#min_layer->best
         fi, fc, fcp, fj, fk = best
         modif_layer.weight[fi,fc:fc+fcp,fj,fk] = 0
     print(f"time for all round for layer {timeit.default_timer()-staime}" )
@@ -57,11 +63,13 @@ def prune_layer(layer, x, f_max = None, max_score=0):#layer is 4d. blocksize, co
     min_list = recoverability_loss(layer, x, layer(x))
     f_max = layer if not f_max else f_max
     bl_max = []
-    for j, (l,f,b) in enumerate(min_list):
+    for j, (l,b) in enumerate(min_list):
         prune_score = (max_dist-l)/((len(min_list)-j)**(1+lam))
-        print(f"{prune_score=}")
+        # print(f"{prune_score=}")
         if prune_score > max_score:
-            max_score, f_max, bl_max = prune_score, f, b
+            max_score, bl_max = prune_score, b
+    for fi, fc, fcp, fj, fk in b:
+        f_max.weight[fi,fc:fc+fcp,fj,fk] = 0
     print("the final best prune was: ", bl_max)
     print("final best prune length was: ", len(bl_max))
     return f_max, max_score

@@ -79,13 +79,13 @@ if __name__ == '__main__':
         Big_data = 20 #  len(trainloader) = 390
         with torch.no_grad():
             images = [data[0].to(device) for q, data in enumerate(trainloader) if q < Big_data]
-            print([data.shape for data in images])
+            # print([data.shape for data in images])
             x = torch.cat(images)
             print("layer size: ",net.encoder.gate[0].weight.shape)
             pruned, _ = recoverability.prune_layer(net.encoder.gate[0], x)
             images = [net.encoder.gate[0](data) for data in images]
             net.encoder.gate[0].weight = pruned.weight
-
+            # print("jojo")
             #self.encoder.blocks[0].blocks # should be 8 rn
             #self.encoder.blocks[0].blocks[j].blocks # should be about 5 one (conv, batch norm) then one relu alternating 
             #self.encoder.blocks[0].blocks[j].blocks[k].conv.weight
