@@ -93,15 +93,6 @@ class ResNetLayer(nn.Module):
         x = self.blocks(x)
         return x
 
-# class Filter(nn.Module):
-#     def __init__(self, prev_mat):
-#         super().__init__()
-#         self.mat = torch.ones_like(prev_mat)
-    
-#     def forward(self, input):
-#         return 
-
-
 
 class ResNetEncoder(nn.Module):
     """

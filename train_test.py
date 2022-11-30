@@ -13,7 +13,7 @@ params = {'epochs': 20, 'batch_size': 128, 'deepths': [8], 'blocks_sizes': [128]
 if __name__ == '__main__':
     args = sys.argv[1:]
     device = torch.device('cuda:0' if torch.cuda.is_available() else 'cpu')
-    p = './Deep2-project/trained_nets/cifar_net.pth'#'./trained_nets/cifar_net.pth'
+    p = './trained_nets/cifar_net.pth' #Path to trained net
     print(f'{device=}')
     transform = transforms.Compose(
         [transforms.ToTensor(),
@@ -41,8 +41,6 @@ if __name__ == '__main__':
         print(f"{len(args)=}")
         if len(args)>0:
             print(args[0])
-        # model = resnet18(3, 1000)
-        # summary(net.cuda(), (3, 224, 224))
         criterion = nn.CrossEntropyLoss()
         optimizer = optim.SGD(net.parameters(), lr=0.001, momentum=0.9)
         print('Starting training')
@@ -57,7 +55,7 @@ if __name__ == '__main__':
                 # forward + backward + optimize
                 outputs = net(inputs)
                 loss = criterion(outputs, labels)
-                loss.backward(retain_graph=True)#Tomer: added in brakets now
+                loss.backward()
                 optimizer.step()
             # print statistics
             running_loss += loss.item()
@@ -68,9 +66,9 @@ if __name__ == '__main__':
         torch.save(net.state_dict(), p)
         if (Path(p).exists()):
             print("Saved model")
-        # optimizer.zero_grad()#Tomer: added now
     else:
         net.load_state_dict(torch.load(p, map_location=torch.device(device)))
+    
     ############ Pruning ##########
     #weight pruning
     print("going into weight pruning")
@@ -79,13 +77,12 @@ if __name__ == '__main__':
         Big_data = 20 #  len(trainloader) = 390
         with torch.no_grad():
             images = [data[0].to(device) for q, data in enumerate(trainloader) if q < Big_data]
-            # print([data.shape for data in images])
             x = torch.cat(images)
             print("layer size: ",net.encoder.gate[0].weight.shape)
             pruned, _ = recoverability.prune_layer(net.encoder.gate[0], x)
             images = [net.encoder.gate[0](data) for data in images]
             net.encoder.gate[0].weight = pruned.weight
-            # print("jojo")
+            #resnat shape
             #self.encoder.blocks[0].blocks # should be 8 rn
             #self.encoder.blocks[0].blocks[j].blocks # should be about 5 one (conv, batch norm) then one relu alternating 
             #self.encoder.blocks[0].blocks[j].blocks[k].conv.weight
@@ -104,29 +101,6 @@ if __name__ == '__main__':
                     images = nimages
                     block.conv.weight = pruned.weight
     
-    #layer pruning
-    # prune_layer = False
-    # if prune_layer:
-    #     Big_data = 1
-    #     import copy
-    #     prune_epoch = 10
-    #     filter = copy.deepcopy(net.encoder.gate[0].weight)
-    #     filter.data = torch.ones_like(net.encoder.gate[0].weight)
-    #     prune_optim = optim.SGD([filter], lr=0.001, momentum=0.9)
-    #     images = [data[0].to(device) for q, data in enumerate(trainloader) if q < Big_data]
-    #     x = torch.cat(images) # constant for now
-    #     ogL= copy.deepcopy(net.encoder.gate[0].weight)
-    #     y = net.encoder.gate[0](x)
-
-    #     for epoch in range(prune_epoch):
-    #         prune_optim.zero_grad()
-    #         net.encoder.gate[0].weight.data = filter * ogL
-    #         loss = recoverability.recov_distance(y,net.encoder.gate[0](x))
-    #         loss.backward(retain_graph=True)
-    #         filter.grad = net.encoder.gate[0].weight.grad
-    #         prune_optim.step()
-
-    
     ############ Test ##########
     correct = 0
     total = 0
@@ -136,26 +110,6 @@ if __name__ == '__main__':
             # images, labels = data
             images, labels = data[0].to(device), data[1].to(device)
             # calculate outputs by running images through the network
-            # if i ==0:
-            #     print("weeeembawehhhhhh")
-            #     # print(images.shape)
-            #     pruned, _ = recoverability.prune_layer(net.encoder.gate[0], images.to(device))
-            #     # pruned, _ = recoverability.prune_layer_all_data(net.encoder.gate[0], trainloader,device)
-            #     x= net.encoder.gate[0](images.to(device))
-            #     net.encoder.gate[0].weight = pruned.weight
-            #     #self.encoder.blocks[0].blocks # should be 8 rn
-            #     #self.encoder.blocks[0].blocks[j].blocks # should be about 5 one (conv, batch norm) then one relu alternating 
-            #     #self.encoder.blocks[0].blocks[j].blocks[k].conv.weight
-
-            #     for j, sequence in enumerate(net.encoder.blocks[0].blocks):
-            #         for k, block in enumerate(sequence.blocks):
-            #             y= block(x) #changed sisnce push ***
-            #             if not getattr(block, 'conv', None):
-            #                 continue
-            #             print(f"{j=} {k=}")
-            #             pruned, _ = recoverability.prune_layer(block.conv, x)
-            #             x=y
-            #             block.conv.weight = pruned.weight
             outputs = net(images)
             # the class with the highest energy is what we choose as prediction
             _, predicted = torch.max(outputs.data, 1)
